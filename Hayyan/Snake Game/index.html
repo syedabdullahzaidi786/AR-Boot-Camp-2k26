@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Snake Neo</title>
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --panel-bg: rgba(20, 30, 48, 0.85);
+            --neon-green: #39ff14;
+            --neon-pink: #ff007f;
+            --neon-blue: #00f0ff;
+            --neon-gold: #ffd700;
+            --text-light: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #1a2639 0%, var(--bg-dark) 100%);
+            color: var(--text-light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        /* App Container Layout */
+        .game-container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            max-width: 1100px;
+            width: 100%;
+            align-items: stretch;
+        }
+
+        /* Sidebar Panels */
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .side-panel {
+            flex: 1;
+            min-width: 240px;
+        }
+
+        /* Stats Display */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8a99ad;
+            margin-bottom: 4px;
+        }
+
+        .stat-val {
+            font-size: 1.4rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        #score { color: var(--neon-blue); }
+        #highScore { color: var(--neon-gold); }
+        #level { color: var(--neon-green); }
+        #speed { color: var(--neon-pink); }
+
+        /* Game Board Wrapper */
+        .board-wrapper {
+            position: relative;
+            background: #05070b;
+            border-radius: 16px;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.15);
+            border: 2px solid rgba(0, 240, 255, 0.3);
+            overflow: hidden;
+            line-height: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Overlay Screens */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 7, 11, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay h2 {
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        #startScreen h2 { color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        #gameOverScreen h2 { color: var(--neon-pink); text-shadow: 0 0 10px var(--neon-pink); }
+        #pauseScreen h2 { color: var(--neon-gold); text-shadow: 0 0 10px var(--neon-gold); }
+
+        .countdown-text {
+            font-size: 5rem;
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 0 0 20px var(--neon-green);
+            animation: pulse 0.5s ease infinite alternate;
+        }
+
+        /* Interactive Elements */
+        btn, button {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+            text-align: center;
+        }
+
+        btn:hover, button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 240, 255, 0.3);
+            filter: brightness(1.1);
+        }
+
+        btn:active, button:active {
+            transform: translateY(1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .audio-ctrl {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Instuctions & Combo info */
+        .info-text {
+            font-size: 0.85rem;
+            color: #a0aec0;
+            line-height: 1.5;
+        }
+
+        .combo-meter {
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .combo-progress {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-pink));
+            transform-origin: left;
+            transition: transform 0.1s linear;
+        }
+
+        /* Mobile Controls */
+        .mobile-controls {
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 240px;
+            margin-top: 15px;
+        }
+
+        .touch-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            color: var(--text-light);
+        }
+        .touch-btn:active { background: rgba(0, 240, 255, 0.3); }
+
+        @keyframes pulse {
+            from { transform: scale(0.9); }
+            to { transform: scale(1.1); }
+        }
+
+        /* Responsive Design */
+        @media(max-width: 850px) {
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .side-panel {
+                width: 100%;
+                max-width: 500px;
+            }
+        }
+
+        @media(max-pointer: coarse) {
+            .mobile-controls {
+                display: grid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="panel side-panel">
+            <h1 style="text-align: center; font-size: 1.6rem; letter-spacing: 1px; background: linear-gradient(45deg, #00f0ff, #ff007f); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NEO SNAKE</h1>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Score</div>
+                    <div id="score" class="stat-val">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">High Score</div>
+                    <div id="highScore" class="stat-val">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Level</div>
+                    <div id="level" class="stat-val">1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Speed</div>
+                    <div id="speed" class="stat-val">1x</div>
+                </div>
+            </div>
+
+            <div id="comboWrapper" style="display: none;">
+                <div class="stat-label" id="comboLabel">Combo Active!</div>
+                <div class="combo-meter"><div id="comboProgress" class="combo-progress"></div></div>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="btnPause" disabled>Pause (Space)</button>
+                <button id="btnRestart" class="btn-danger">Restart</button>
+                <button id="btnMute" class="audio-ctrl">Mute Audio</button>
+            </div>
+        </div>
+
+        <div class="board-wrapper">
+            <div id="startScreen" class="overlay active">
+                <h2>ARCADE SNAKE</h2>
+                <p class="info-text" style="text-align:center;">Feed the snake, avoid walls, outrun your tail.</p>
+                <button id="btnStart" class="btn-success" style="max-width: 200px;">Play Now</button>
+            </div>
+
+            <div id="countdownScreen" class="overlay">
+                <div id="countdownText" class="countdown-text">3</div>
+            </div>
+
+            <div id="pauseScreen" class="overlay">
+                <h2>GAME PAUSED</h2>
+                <p class="info-text">Press Spacebar or click Resume to continue</p>
+                <button id="btnResume" class="btn-success" style="max-width: 200px;">Resume</button>
+            </div>
+
+            <div id="gameOverScreen" class="overlay">
+                <h2>GAME OVER</h2>
+                <div class="stat-label">Final Score</div>
+                <div id="finalScore" style="font-size: 2.5rem; font-weight: bold; color: var(--neon-pink); margin-bottom: 10px;">0</div>
+                <button id="btnRetry" class="btn-success" style="max-width: 200px;">Try Again</button>
+            </div>
+
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div class="panel side-panel">
+            <h3>How To Play</h3>
+            <p class="info-text"><strong>Desktop:</strong> Use <b>Arrow Keys</b> or <b>WASD</b> to maneuver. Press <b>Spacebar</b> to pause.</p>
+            <p class="info-text"><strong>Mobile/Tablets:</strong> Swipe on the game screen in your desired direction, or use the on-screen D-pad.</p>
+            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
+            <p class="info-text">💡 <i>Tip: Eat fruits within 3 seconds of each other to accumulate combo multipliers and skyrocket your high score!</i></p>
+
+            <div class="mobile-controls">
+                <div></div><div class="touch-btn" data-dir="UP">↑</div><div></div>
+                <div class="touch-btn" data-dir="LEFT">←</div><div class="touch-btn" data-dir="DOWN">↓</div><div class="touch-btn" data-dir="RIGHT">→</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Web Audio API Synthesizer (No external assets required)
+         */
+        const SoundSystem = {
+            ctx: null,
+            muted: false,
+            init() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            },
+            playEat(isGolden = false) {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+                osc.type = 'triangle';
+                if (isGolden) {
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.15); // C6
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else {
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                }
+            },
+            playGameOver() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(80, now + 0.5);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        };
+
+        /**
+         * Game Configuration and State Object
+         */
+        const Config = {
+            gridSize: 20,
+            baseSpeed: 130,      // Starting update frame delta (ms)
+            speedStep: 6,        // Speed reduction per level increment
+            minSpeed: 45,        // Max ceiling performance speed limit
+            comboWindow: 3000,   // Time in ms allowed to keep a combo running
+        };
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resizeCanvas();
+
+                // Core Systems Setup
+                this.snake = [];
+                this.direction = 'RIGHT';
+                this.nextDirection = 'RIGHT';
+                this.fruit = { x: 0, y: 0, isGolden: false };
+                this.score = 0;
+                this.highScore = parseInt(localStorage.getItem('neo_highscore')) || 0;
+                this.level = 1;
+                this.speed = Config.baseSpeed;
+                
+                this.state = 'START_SCREEN'; // START_SCREEN, COUNTDOWN, PLAYING, PAUSED, GAME_OVER
+                this.particles = [];
+                this.lastTime = 0;
+                this.accumulatedTime = 0;
+                this.comboCount = 0;
+                this.lastEatTime = 0;
+
+                this.initDOM();
+                this.initInput();
+                this.updateUI();
+                
+                // Fire Up the Rendering loop
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            resizeCanvas() {
+                // Generates standardized 500x500 box coordinate structures
+                this.canvas.width = 500;
+                this.canvas.height = 500;
+                this.cols = this.canvas.width / Config.gridSize;
+                this.rows = this.canvas.height / Config.gridSize;
+            }
+
+            initDOM() {
+                this.dom = {
+                    score: document.getElementById('score'),
+                    highScore: document.getElementById('highScore'),
+                    level: document.getElementById('level'),
+                    speed: document.getElementById('speed'),
+                    finalScore: document.getElementById('finalScore'),
+                    comboWrapper: document.getElementById('comboWrapper'),
+                    comboLabel: document.getElementById('comboLabel'),
+                    comboProgress: document.getElementById('comboProgress'),
+                    // Screens
+                    startScreen: document.getElementById('startScreen'),
+                    countdownScreen: document.getElementById('countdownScreen'),
+                    countdownText: document.getElementById('countdownText'),
+                    pauseScreen: document.getElementById('pauseScreen'),
+                    gameOverScreen: document.getElementById('gameOverScreen'),
+                    // Actions
+                    btnStart: document.getElementById('btnStart'),
+                    btnPause: document.getElementById('btnPause'),
+                    btnResume: document.getElementById('btnResume'),
+                    btnRestart: document.getElementById('btnRestart'),
+                    btnRetry: document.getElementById('btnRetry'),
+                    btnMute: document.getElementById('btnMute')
+                };
+
+                this.dom.btnStart.addEventListener('click', () => this.startCountdown());
+                this.dom.btnRetry.addEventListener('click', () => this.startCountdown());
+                this.dom.btnResume.addEventListener('click', () => this.resumeGame());
+                this.dom.btnPause.addEventListener('click', () => this.pauseGame());
+                this.dom.btnRestart.addEventListener('click', () => this.resetToStart());
+                
+                this.dom.btnMute.addEventListener('click', () => {
+                    SoundSystem.muted = !SoundSystem.muted;
+                    this.dom.btnMute.textContent = SoundSystem.muted ? "Unmute Audio" : "Mute Audio";
+                    this.dom.btnMute.style.background = SoundSystem.muted ? "rgba(239,71,58,0.2)" : "rgba(255,255,255,0.05)";
+                });
+            }
+
+            initInput() {
+                // Key Maps
+                const keyMap = {
+                    'ArrowUp': 'UP', 'KeyW': 'UP',
+                    'ArrowDown': 'DOWN', 'KeyS': 'DOWN',
+                    'ArrowLeft': 'LEFT', 'KeyA': 'LEFT',
+                    'ArrowRight': 'RIGHT', 'KeyD': 'RIGHT'
+                };
+
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        if (this.state === 'PLAYING') this.pauseGame();
+                        else if (this.state === 'PAUSED') this.resumeGame();
+                        return;
+                    }
+
+                    const targetDir = keyMap[e.code];
+                    if (targetDir) {
+                        e.preventDefault();
+                        this.setDirection(targetDir);
+                    }
+                });
+
+                // On screen control pad 
+                document.querySelectorAll('.touch-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.setDirection(btn.dataset.dir);
+                    });
+                });
+
+                // Swipe Gestures Logic
+                let touchStartX = 0;
+                let touchStartY = 0;
+                this.canvas.addEventListener('touchstart', (e) => {
+                    touchStartX = e.changedTouches[0].screenX;
+                    touchStartY = e.changedTouches[0].screenY;
+                }, { passive: true });
+
+                this.canvas.addEventListener('touchend', (e) => {
+                    const diffX = e.changedTouches[0].screenX - touchStartX;
+                    const diffY = e.changedTouches[0].screenY - touchStartY;
+                    
+                    if (Math.abs(diffX) > Math.abs(diffY)) {
+                        if (Math.abs(diffX) > 30) {
+                            this.setDirection(diffX > 0 ? 'RIGHT' : 'LEFT');
+                        }
+                    } else {
+                        if (Math.abs(diffY) > 30) {
+                            this.setDirection(diffY > 0 ? 'DOWN' : 'UP');
+                        }
+                    }
+                }, { passive: true });
+            }
+
+            setDirection(dir) {
+                if (this.state !== 'PLAYING') return;
+                // Anti-self-intersection logic verification
+                if (dir === 'UP' && this.direction === 'DOWN') return;
+                if (dir === 'DOWN' && this.direction === 'UP') return;
+                if (dir === 'LEFT' && this.direction === 'RIGHT') return;
+                if (dir === 'RIGHT' && this.direction === 'LEFT') return;
+                this.nextDirection = dir;
+            }
+
+            startCountdown() {
+                if (!SoundSystem.ctx) SoundSystem.init();
+                this.closeOverlays();
+                this.state = 'COUNTDOWN';
+                this.dom.countdownScreen.classList.add('active');
+                
+                let count = 3;
+                this.dom.countdownText.textContent = count;
+                
+                clearInterval(this.countdownInterval);
+                this.countdownInterval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        this.dom.countdownText.textContent = count;
+                    } else {
+                        clearInterval(this.countdownInterval);
+                        this.startGame();
+                    }
+                }, 600);
+            }
+
+            startGame() {
+                this.closeOverlays();
+                this.snake = [
+                    { x: 5, y: 10 },
+                    { x: 4, y: 10 },
+                    { x: 3, y: 10 }
+                ];
+                this.direction = 'RIGHT';
+                this.nextDirection = 'RIGHT';
+                this.score = 0;
+                this.level = 1;
+                this.comboCount = 0;
+                this.lastEatTime = 0;
+                this.speed = Config.baseSpeed;
+                this.particles = [];
+                this.spawnFruit();
+                this.state = 'PLAYING';
+                this.dom.btnPause.disabled = false;
+                this.updateUI();
+            }
+
+            pauseGame() {
+                if (this.state !== 'PLAYING') return;
+                this.state = 'PAUSED';
+                this.dom.pauseScreen.classList.add('active');
+            }
+
+            resumeGame() {
+                if (this.state !== 'PAUSED') return;
+                this.closeOverlays();
+                this.state = 'PLAYING';
+            }
+
+            resetToStart() {
+                this.closeOverlays();
+                this.state = 'START_SCREEN';
+                this.dom.startScreen.classList.add('active');
+                this.dom.btnPause.disabled = true;
+                this.score = 0;
+                this.updateUI();
+            }
+
+            gameOver() {
+                this.state = 'GAME_OVER';
+                SoundSystem.playGameOver();
+                this.dom.btnPause.disabled = true;
+                this.dom.finalScore.textContent = this.score;
+                this.dom.gameOverScreen.classList.add('active');
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('neo_highscore', this.highScore);
+                }
+                this.updateUI();
+            }
+
+            closeOverlays() {
+                this.dom.startScreen.classList.remove('active');
+                this.dom.countdownScreen.classList.remove('active');
+                this.dom.pauseScreen.classList.remove('active');
+                this.dom.gameOverScreen.classList.remove('active');
+            }
+
+            spawnFruit() {
+                let validPositions = [];
+                // Look up table configurations to prevent fruit from overlaying the snake's body coordinates
+                for (let c = 0; c < this.cols; c++) {
+                    for (let r = 0; r < this.rows; r++) {
+                        if (!this.snake.some(segment => segment.x === c && segment.y === r)) {
+                            validPositions.push({ x: c, y: r });
+                        }
+                    }
+                }
+                if (validPositions.length === 0) return this.gameOver(); // Victory condition shortcut
+
+                const chosen = validPositions[Math.floor(Math.random() * validPositions.length)];
+                this.fruit.x = chosen.x;
+                this.fruit.y = chosen.y;
+                this.fruit.isGolden = Math.random() < 0.12; // 12% probability rating for Golden Super Foods
+            }
+
+            updateGame() {
+                this.direction = this.nextDirection;
+                // Evaluate head vectors
+                const head = { ...this.snake[0] };
+                switch (this.direction) {
+                    case 'UP': head.y--; break;
+                    case 'DOWN': head.y++; break;
+                    case 'LEFT': head.x--; break;
+                    case 'RIGHT': head.x++; break;
+                }
+
+                // Wall Collisions
+                if (head.x < 0 || head.x >= this.cols || head.y < 0 || head.y >= this.rows) {
+                    return this.gameOver();
+                }
+
+                // Self Body Collision Check
+                if (this.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                    return this.gameOver();
+                }
+
+                // Append new localized Head vector array item
+                this.snake.unshift(head);
+
+                // Consumption Verification Checks
+                if (head.x === this.fruit.x && head.y === this.fruit.y) {
+                    this.handleFruitEating();
+                } else {
+                    this.snake.pop(); // Remove tail tip tracking if standard step iteration completes safely
+                }
+            }
+
+            handleFruitEating() {
+                const now = performance.now();
+                const isComboActive = (now - this.lastEatTime) < Config.comboWindow;
+                
+                if (isComboActive) {
+                    this.comboCount++;
+                } else {
+                    this.comboCount = 1;
+                }
+                this.lastEatTime = now;
+
+                // Base scoring values
+                let addedScore = this.fruit.isGolden ? 35 : 10;
+                addedScore *= this.comboCount; // Scale via combo factor increments
+                this.score += addedScore;
+
+                // Sound & FX Triggers
+                SoundSystem.playEat(this.fruit.isGolden);
+                this.createParticles(this.fruit.x, this.fruit.y, this.fruit.isGolden ? '#ffd700' : '#ff007f');
+
+                // Dynamic level advancement computations
+                const oldLevel = this.level;
+                this.level = Math.floor(this.snake.length / 5) + 1;
+                this.speed = Math.max(Config.minSpeed, Config.baseSpeed - (this.level * Config.speedStep));
+
+                this.spawnFruit();
+                this.updateUI();
+            }
+
+            createParticles(gridX, gridY, color) {
+                const pX = gridX * Config.gridSize + Config.gridSize / 2;
+                const pY = gridY * Config.gridSize + Config.gridSize / 2;
+                for (let i = 0; i < 15; i++) {
+                    this.particles.push({
+                        x: pX,
+                        y: pY,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 6,
+                        radius: Math.random() * 3 + 2,
+                        alpha: 1,
+                        color: color
+                    });
+                }
+            }
+
+            updateUI() {
+                this.dom.score.textContent = this.score;
+                this.dom.highScore.textContent = this.highScore;
+                this.dom.level.textContent = this.level;
+                // Human-readable velocity index values
+                const currentRelSpeed = ((Config.baseSpeed / this.speed)).toFixed(1);
+                this.dom.speed.textContent = `${currentRelSpeed}x`;
+            }
+
+            manageComboMeter(now) {
+                if (this.comboCount > 1) {
+                    const elapsed = now - this.lastEatTime;
+                    const remainingRatio = 1 - (elapsed / Config.comboWindow);
+                    if (remainingRatio > 0) {
+                        this.dom.comboWrapper.style.display = 'block';
+                        this.dom.comboLabel.textContent = `Combo x${this.comboCount}!`;
+                        this.dom.comboProgress.style.transform = `scaleX(${remainingRatio})`;
+                    } else {
+                        this.comboCount = 0;
+                        this.dom.comboWrapper.style.display = 'none';
+                    }
+                } else {
+                    this.dom.comboWrapper.style.display = 'none';
+                }
+            }
+
+            draw() {
+                // Background clear with subtle scanning line grids
+                this.ctx.fillStyle = '#05070b';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Grid lines background layout
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+                this.ctx.lineWidth = 1;
+                for(let i=0; i <= this.cols; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i * Config.gridSize, 0);
+                    this.ctx.lineTo(i * Config.gridSize, this.canvas.height);
+                    this.ctx.stroke();
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, i * Config.gridSize);
+                    this.ctx.lineTo(this.canvas.width, i * Config.gridSize);
+                    this.ctx.stroke();
+                }
+
+                // Render Fruit Target Objects
+                const fRadius = Config.gridSize / 2;
+                const fx = this.fruit.x * Config.gridSize + fRadius;
+                const fy = this.fruit.y * Config.gridSize + fRadius;
+                
+                this.ctx.shadowBlur = this.fruit.isGolden ? 20 : 12;
+                this.ctx.shadowColor = this.fruit.isGolden ? varCSS('--neon-gold') : varCSS('--neon-pink');
+                this.ctx.fillStyle = this.fruit.isGolden ? varCSS('--neon-gold') : varCSS('--neon-pink');
+                
+                this.ctx.beginPath();
+                this.ctx.arc(fx, fy, fRadius - 2, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Render Snake System
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = varCSS('--neon-blue');
+                
+                this.snake.forEach((segment, index) => {
+                    const sx = segment.x * Config.gridSize;
+                    const sy = segment.y * Config.gridSize;
+                    const size = Config.gridSize;
+
+                    if (index === 0) {
+                        // Custom styling for Head node
+                        this.ctx.fillStyle = varCSS('--neon-blue');
+                        this.ctx.fillRect(sx + 1, sy + 1, size - 2, size - 2);
+                        // Add tiny neon eyes to reveal head alignment vector directions
+                        this.ctx.fillStyle = '#000';
+                        this.ctx.shadowBlur = 0;
+                        if (this.direction === 'RIGHT' || this.direction === 'LEFT') {
+                            this.ctx.fillRect(sx + (this.direction==='RIGHT'?12:4), sy + 4, 3, 3);
+                            this.ctx.fillRect(sx + (this.direction==='RIGHT'?12:4), sy + 12, 3, 3);
+                        } else {
+                            this.ctx.fillRect(sx + 4, sy + (this.direction==='DOWN'?12:4), 3, 3);
+                            this.ctx.fillRect(sx + 12, sy + (this.direction==='DOWN'?12:4), 3, 3);
+                        }
+                        this.ctx.shadowBlur = 10; // Restore global blur settings
+                    } else {
+                        // Smooth gradient transitions down snake segments
+                        const alpha = Math.max(0.2, 1 - (index / this.snake.length));
+                        this.ctx.fillStyle = `rgba(57, 255, 20, ${alpha})`;
+                        this.ctx.shadowColor = varCSS('--neon-green');
+                        this.ctx.fillRect(sx + 2, sy + 2, size - 4, size - 4);
+                    }
+                });
+
+                // Particle Simulation System Render passes
+                this.ctx.shadowBlur = 0; // Disable blur overhead calculations during loops
+                this.particles.forEach((p, index) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= 0.03;
+                    if (p.alpha <= 0) {
+                        this.particles.splice(index, 1);
+                    } else {
+                        this.ctx.fillStyle = p.color;
+                        this.ctx.globalAlpha = p.alpha;
+                        this.ctx.beginPath();
+                        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                });
+                this.ctx.globalAlpha = 1.0; // Standard restore properties safety resets
+            }
+
+            loop(timestamp) {
+                if (!this.lastTime) this.lastTime = timestamp;
+                let elapsed = timestamp - this.lastTime;
+                this.lastTime = timestamp;
+
+                if (this.state === 'PLAYING') {
+                    this.accumulatedTime += elapsed;
+                    while (this.accumulatedTime >= this.speed) {
+                        this.updateGame();
+                        this.accumulatedTime -= this.speed;
+                    }
+                    this.manageComboMeter(timestamp);
+                }
+
+                this.draw();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+        }
+
+        // Helper shortcut string mapping parsing utility function
+        function varCSS(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        // Start initialization on window load
+        window.addEventListener('DOMContentLoaded', () => {
+            new Game();
+        });
+    </script>
+</body>
+</html>
